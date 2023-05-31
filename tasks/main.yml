@@ -1,27 +1,38 @@
 ---
-- include: check_vars.yml
+- import_tasks: check_vars.yml
 
-- include: download.yml
+- import_tasks: download.yml
+  when: redis_install_from_source | d(false) | bool
   tags:
     - download
 
-- include: dependencies.yml
+- import_tasks: dependencies.yml
+  when: redis_install_from_source | d(false) | bool
   tags:
     - install
 
-- include: install.yml
+- import_tasks: install_from_source.yml
+  when: redis_install_from_source | d(false) | bool
   tags:
     - install
 
-- include: server.yml
-  when: not redis_sentinel
+- import_tasks: install_from_pkg.yml
+  when: not redis_install_from_source | d(false) | bool
+  tags:
+  - install
+
+- import_tasks: server.yml
+  when: not redis_sentinel | bool
   tags:
     - config
 
-- include: sentinel.yml
-  when: redis_sentinel
+- import_tasks: sentinel.yml
+  when: redis_sentinel | bool
   tags:
     - config
 
-- include: local_facts.yml
+- import_tasks: local_facts.yml
   when: redis_local_facts|bool
+
+- import_tasks: haproxy.yml
+  when: redis_haproxy_enabled | d(false) | bool

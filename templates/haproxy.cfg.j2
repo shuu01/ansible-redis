@@ -1,0 +1,44 @@
+#jinja2:lstrip_blocks: True
+{{ ansible_managed | comment }}
+
+# Specifies TCP timeout on connect for use by the frontend ft_redis
+# Set the max time to wait for a connection attempt to a server to succeed
+# The server and client side expected to acknowledge or send data.
+defaults redis
+  mode tcp
+  timeout connect 6s
+  timeout server 300s
+  timeout client 300s
+  log     global
+  mode    tcp
+  option  tcplog
+  option  dontlognull
+  option  log-health-checks
+
+# Specifies listening socket for accepting client connections using the default
+# REDIS TCP timeout and backend bk_redis TCP health check.
+frontend ft_redis
+  option  tcplog
+  bind {{ redis_haproxy_bind }}:6378 name redis
+  bind /var/run/haproxy-redis.sock name redis mode 777
+  default_backend bk_redis
+
+# Specifies the backend Redis proxy server TCP health settings
+# Ensure it only forward incoming connections to reach a master.
+backend bk_redis
+  option  tcplog
+  option tcp-check
+  tcp-check connect
+  tcp-check send PING\r\n
+  tcp-check expect string +PONG
+  tcp-check send info\ replication\r\n
+  tcp-check expect string role:master
+  tcp-check send QUIT\r\n
+  tcp-check expect string +OK
+  {% for host in groups.get('redis_master') + groups.get('redis_slave') %}
+    {% if host == inventory_hostname %}
+  server redis_{{ loop.index }} localhost:6379 check inter 2s
+    {% else %}
+  server redis_{{ loop.index }} {{ hostvars[host]['private_ip'] }}:6379 check inter 2s
+    {% endif %}
+  {% endfor %}

@@ -1,0 +1,8 @@
+---
+- name: template haproxy config
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/redis.cfg
+    mode: '0644'
+    validate: haproxy -f %s -c -q
+  notify: reload haproxy
